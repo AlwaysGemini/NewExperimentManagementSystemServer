@@ -1,6 +1,8 @@
 package always.gemini.experimentmanagementsystemserver.controller;
 
+import always.gemini.experimentmanagementsystemserver.bean.ExperimentalItemAchievementTableTemplate;
 import always.gemini.experimentmanagementsystemserver.bean.Response;
+import always.gemini.experimentmanagementsystemserver.util.ExcelUtils;
 import always.gemini.experimentmanagementsystemserver.util.QueryUtils;
 import always.gemini.experimentmanagementsystemserver.util.SQLBuilder;
 import net.sf.json.JSONArray;
@@ -97,7 +99,50 @@ public class ExperimentAchievementController {
                 .addWhereEqualTo("experiment_course_match_id", experiment_course_match_id)
                 .create();
         jdbcTemplate.execute(updateString);
+        if (experiment_achievement_table_state.equals("审核通过")){
+            String queryString = new SQLBuilder.QueryBuilder()
+                    .addQueryItem("experiment_achievement_table_url")
+                    .fromTable("experiment_course_match")
+                    .addWhereEqualTo("experiment_course_match_id", experiment_course_match_id)
+                    .create();
+            String experiment_achievement_table_url = jdbcTemplate.queryForObject(queryString,String.class);
+            List<ExperimentalItemAchievementTableTemplate> list = new ArrayList<>();
+            try {
+                list = ExcelUtils.getBankListByExcel(experiment_achievement_table_url, ExperimentalItemAchievementTableTemplate.class);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            for(ExperimentalItemAchievementTableTemplate experimentalItemAchievementTableTemplate:list){
+                String updateScoreString = new SQLBuilder.UpdateBuilder()
+                        .from("experimental_course_selection")
+                        .set("score", experimentalItemAchievementTableTemplate.getScore())
+                        .addWhereEqualTo("experimental_course_selection_id", experimentalItemAchievementTableTemplate.getExperimental_course_selection_id())
+                        .create();
+                jdbcTemplate.execute(updateScoreString);
+            }
+            return new Response(200,"审核成功",list);
+        }
         return new Response(200, "审核成功", new ArrayList<>());
+    }
+
+    @PostMapping("test")
+    public Response test(){
+        String fileName = "01010356 - 1 - 实验项目成绩表格.xlsx";
+        List<ExperimentalItemAchievementTableTemplate> list = new ArrayList<>();
+        try {
+            list = ExcelUtils.getBankListByExcel(fileName, ExperimentalItemAchievementTableTemplate.class);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        for(ExperimentalItemAchievementTableTemplate experimentalItemAchievementTableTemplate:list){
+            String updateString = new SQLBuilder.UpdateBuilder()
+                    .from("experimental_course_selection")
+                    .set("score", experimentalItemAchievementTableTemplate.getScore())
+                    .addWhereEqualTo("experimental_course_selection_id", experimentalItemAchievementTableTemplate.getExperimental_course_selection_id())
+                    .create();
+            jdbcTemplate.execute(updateString);
+        }
+        return new Response(200,"成功",list);
     }
 
     @PostMapping("importExperimentAchievement")
@@ -115,5 +160,16 @@ public class ExperimentAchievementController {
             jdbcTemplate.update(updateString);
         }
         return new Response(200, "插入成功", new ArrayList<>());
+    }
+
+    @PostMapping("checkOutAchievement")
+    public Response checkOutAchievement(@RequestParam String student_id){
+        String queryString = new SQLBuilder.QueryBuilder()
+                .addQueryItem("*")
+                .fromTable("view_experiment_achievement")
+                .addWhereEqualTo("student_id",student_id)
+                .create();
+        List<Map<String, Object>> list = jdbcTemplate.queryForList(queryString);
+        return new Response(200,"查询成功",list);
     }
 }

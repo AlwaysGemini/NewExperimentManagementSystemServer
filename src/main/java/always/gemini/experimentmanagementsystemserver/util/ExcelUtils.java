@@ -6,6 +6,8 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.FileInputStream;
@@ -84,6 +86,71 @@ public class ExcelUtils {
                 if (fieldAnnotation != null) {
                     TableColumn smartColumn = (TableColumn) fieldAnnotation;
                     cell = row.getCell(smartColumn.id() - 1);
+                    cell.setCellType(Cell.CELL_TYPE_STRING);
+                    invokeSet(temp, field.getName(), cell.getStringCellValue());
+                }
+            }
+            list.add(temp);
+        }
+        return list;
+    }
+
+    /**
+     * 读取excel表
+     *
+     * @param
+     * @param
+     * @return
+     * @throws Exception
+     */
+    public static <T> List<T> getBankListByExcel(String fileName, Class<T> clazz) throws Exception {
+        List<T> list = new ArrayList<>();             // 读取的数据放入该集合中
+
+        XSSFWorkbook book = new XSSFWorkbook("/always/" + fileName);		// 文件所在位置
+        sheet = book.getSheetAt(0);
+
+        Field[] fields = clazz.getDeclaredFields();
+        try {
+            InputStream is = new FileInputStream(fileName);
+            String postfix = fileName.substring(fileName.lastIndexOf("."),
+                    fileName.length());
+            if (postfix.equals(".xls")) {
+                // 针对 2003 Excel 文件
+                wb = new HSSFWorkbook(new POIFSFileSystem(is));
+                sheet = wb.getSheetAt(0);
+            } else {
+                // 针对2007 Excel 文件
+                wb = new XSSFWorkbook(is);
+                sheet = wb.getSheetAt(0);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        sheet = wb.getSheetAt(0);
+        int rowNum = sheet.getLastRowNum();// 得到总行数
+        row = sheet.getRow(0);
+        int colNum = row.getPhysicalNumberOfCells();
+
+        T temp = null;
+        try {
+            temp = clazz.newInstance();
+        } catch (InstantiationException | IllegalAccessException e) {
+
+        }
+        for (int i = 1; i <= rowNum; i++) {
+            row = sheet.getRow(i);
+            try {
+                temp = clazz.newInstance();
+            } catch (InstantiationException | IllegalAccessException e) {
+
+            }
+            for (Field field : fields) {
+                field.setAccessible(true);
+                Annotation fieldAnnotation = field.getAnnotation(TableColumn.class);
+                if (fieldAnnotation != null) {
+                    TableColumn smartColumn = (TableColumn) fieldAnnotation;
+                    cell = row.getCell(smartColumn.id() - 1);
+                    cell.setCellType(Cell.CELL_TYPE_STRING);
                     invokeSet(temp, field.getName(), cell.getStringCellValue());
                 }
             }
